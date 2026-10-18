@@ -1,0 +1,578 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Moniteur de Plongée</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js" id="MathJax-script" async></script>
+<style>
+  /* Layout: scene card (depth gauge + diver) beside a side column (controls, 16-compartment bars); stacks to one column under 760px. */
+  :root{
+    --abyss: #050b12;
+    --panel: #0c1b28;
+    --panel-2: #0f2130;
+    --border: #1c3444;
+    --fg: #e8f4f7;
+    --fg-dim: #86a2ad;
+    --accent: #36c9b6;
+    --warn: #f2a93b;
+    --danger: #ef5b4e;
+    --water-top: #123b52;
+    --water-bottom: #03070d;
+    color-scheme: dark;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    background: var(--abyss);
+    color: var(--fg);
+    font-family: 'Figtree', system-ui, sans-serif;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 28px 48px;
+  }
+
+  .page{ max-width: 1040px; margin: 0 auto; display:flex; flex-direction:column; gap:28px; }
+
+  .page-head{ display:flex; flex-direction:column; gap:6px; max-width: 640px; }
+  .eyebrow{
+    margin:0; font-family:'IBM Plex Mono', monospace; font-size:0.72rem; letter-spacing:0.12em;
+    text-transform:uppercase; color: var(--accent);
+  }
+  h1{
+    margin:0; font-family:'Big Shoulders Display', sans-serif; font-weight:700;
+    font-size: clamp(1.9rem, 5vw, 2.6rem); letter-spacing:0.01em; text-wrap:balance;
+  }
+  .sub{ margin:0; color: var(--fg-dim); font-size:0.95rem; line-height:1.5; max-width: 60ch; }
+
+  .layout{ display:grid; grid-template-columns: 1.25fr 1fr; gap:20px; align-items:start; }
+  @media (max-width: 760px){ .layout{ grid-template-columns: 1fr; } }
+
+  .card{
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px 18px 20px;
+  }
+  .card h2{
+    margin: 0 0 12px; font-family:'Big Shoulders Display', sans-serif; font-weight:700;
+    font-size:1.05rem; letter-spacing:0.04em; text-transform:uppercase; color: var(--fg);
+  }
+
+  /* --- scene --- */
+  .scene-card{ background: var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px; min-width:0; }
+  #scene{ width:100%; height:auto; display:block; }
+  .readouts{ display:flex; flex-wrap:wrap; gap:18px; margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
+  .readout{ display:flex; flex-direction:column; gap:2px; min-width:92px; }
+  .readout-label{ font-size:0.7rem; letter-spacing:0.08em; text-transform:uppercase; color: var(--fg-dim); }
+  .readout-value{
+    font-family:'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; font-weight:600;
+    font-size:1.25rem; color: var(--fg);
+  }
+  .readout-value small{ font-size:0.7rem; font-weight:500; color: var(--fg-dim); }
+  .status{
+    margin: 12px 0 0; padding: 9px 12px; border-radius:7px; background: var(--panel-2);
+    border: 1px solid var(--border); font-size:0.88rem; color: var(--fg); font-weight:500;
+  }
+  .status.warn{ border-color: var(--warn); color: var(--warn); }
+  .status.danger{ border-color: var(--danger); color: var(--danger); }
+  .status.ok{ border-color: var(--accent); color: var(--accent); }
+
+  /* --- side column --- */
+  .side{ display:flex; flex-direction:column; gap:18px; min-width:0; }
+
+  .field{ display:flex; justify-content:space-between; align-items:baseline; font-size:0.85rem; margin: 14px 0 6px; }
+  .field:first-of-type{ margin-top:2px; }
+  .field-value{ font-family:'IBM Plex Mono', monospace; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%; height:4px; border-radius:2px;
+    background: var(--border); outline-offset: 4px;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:16px; height:16px; border-radius:50%;
+    background: var(--accent); border:2px solid var(--abyss); cursor:pointer; margin-top:-6px;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:16px; height:16px; border-radius:50%; background: var(--accent); border:2px solid var(--abyss); cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track{ height:4px; border-radius:2px; background: var(--border); }
+  input[type=range]::-moz-range-track{ height:4px; border-radius:2px; background: var(--border); }
+
+  .speed-group{ display:flex; gap:8px; margin: 16px 0 14px; }
+  .speed-btn{
+    flex:1; padding:7px 0; border-radius:6px; border:1px solid var(--border); background: var(--panel-2);
+    color: var(--fg-dim); font-family:'IBM Plex Mono', monospace; font-size:0.85rem; cursor:pointer;
+  }
+  .speed-btn.active{ border-color: var(--accent); color: var(--accent); background: rgba(54,201,182,0.1); }
+
+  .btn-row{ display:flex; gap:10px; }
+  .btn{
+    flex:1; padding:10px 0; border-radius:7px; border:1px solid var(--border); background: var(--panel-2);
+    color: var(--fg); font-family:'Figtree', sans-serif; font-weight:600; font-size:0.92rem; cursor:pointer;
+  }
+  .btn.primary{ background: var(--accent); border-color: var(--accent); color: #03241f; }
+  .btn:focus-visible, .speed-btn:focus-visible, input:focus-visible{
+    outline: 2px solid var(--accent); outline-offset:2px;
+  }
+
+  .hint{ margin: 0 0 12px; font-size:0.82rem; color: var(--fg-dim); line-height:1.5; }
+
+  .comp-row{
+    display:grid; grid-template-columns: 76px 1fr auto; align-items:center; gap:10px;
+    padding: 4px 0;
+  }
+  .comp-label{ font-family:'IBM Plex Mono', monospace; font-size:0.74rem; color: var(--fg-dim); }
+  .comp-label small{ display:block; color: var(--fg-dim); opacity:0.75; }
+  .comp-track{ position:relative; height:8px; border-radius:4px; background: var(--panel-2); overflow:hidden; min-width:0; }
+  .comp-fill{ position:absolute; left:0; top:0; bottom:0; width:0%; background: var(--accent); transition: width 0.08s linear, background 0.15s linear; }
+  .comp-badge{
+    font-family:'IBM Plex Mono', monospace; font-size:0.62rem; letter-spacing:0.05em; text-transform:uppercase;
+    color: var(--danger); border:1px solid var(--danger); border-radius:4px; padding:2px 5px; white-space:nowrap;
+  }
+  .comp-row.directeur .comp-label{ color: var(--fg); }
+
+  .formula{
+    margin:0; text-align:center; font-family:'IBM Plex Mono', monospace; font-size:0.78rem;
+    color: var(--fg-dim); letter-spacing:0.01em;
+  }
+  .formula sub, .formula sup{ font-size:0.7em; }
+
+  .grid-label{ font-family:'IBM Plex Mono', monospace; font-size:9px; fill: var(--fg-dim); }
+  .surface-label{ font-family:'IBM Plex Mono', monospace; font-size:9px; fill: var(--fg); font-weight:600; }
+  .ceil-label{ font-family:'IBM Plex Mono', monospace; font-size:10px; fill: var(--danger); font-weight:600; }
+
+  .diver-art{ cursor:pointer; }
+  .diver-art:focus-visible{ outline:2px solid var(--accent); outline-offset:4px; }
+  #diver{ transition: transform 0.15s linear; }
+  .diver-tank{ fill:#0a1c28; stroke: var(--border); stroke-width:1.2; }
+  .diver-tank-valve{ fill:#1c3444; }
+  .diver-body{ fill:#123247; stroke: var(--accent); stroke-width:1.6; }
+  .diver-limb{ fill:#0e2a3a; stroke: var(--accent); stroke-width:1.3; }
+  .diver-fin{ fill: var(--accent); opacity:0.9; }
+  .diver-head{ fill:#123247; stroke: var(--accent); stroke-width:1.6; }
+  .diver-mask{ fill: rgba(200,235,240,0.55); stroke: var(--accent); stroke-width:1; }
+  .diver-hose{ stroke: var(--accent); stroke-width:1.2; }
+
+  .info-btn{
+    align-self:flex-start; margin-top:4px; padding:7px 14px; border-radius:999px;
+    border:1px solid var(--border); background: var(--panel-2); color: var(--accent);
+    font-family:'Figtree', sans-serif; font-weight:600; font-size:0.82rem; cursor:pointer;
+  }
+  .info-btn:hover{ border-color: var(--accent); }
+
+  .modal-backdrop{
+    position:fixed; inset:0; background: rgba(2,6,10,0.72); display:flex; align-items:center;
+    justify-content:center; padding: 20px; z-index:50;
+  }
+  .modal{
+    background: var(--panel); border:1px solid var(--border); border-radius:12px;
+    max-width: 560px; width:100%; max-height:85vh; overflow-y:auto; padding: 22px 24px 26px;
+  }
+  .modal-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px; }
+  .modal-head h2{
+    margin:0; font-family:'Big Shoulders Display', sans-serif; font-weight:700; font-size:1.3rem;
+    text-transform:uppercase; letter-spacing:0.03em;
+  }
+  .modal-close{
+    background:none; border:1px solid var(--border); border-radius:6px; color: var(--fg-dim);
+    width:30px; height:30px; cursor:pointer; font-size:0.9rem; flex-shrink:0;
+  }
+  .modal-close:hover{ color: var(--fg); border-color: var(--accent); }
+  .modal-body h3{
+    margin: 16px 0 6px; font-family:'Big Shoulders Display', sans-serif; font-weight:600;
+    font-size:0.95rem; text-transform:uppercase; letter-spacing:0.04em; color: var(--accent);
+  }
+  .modal-body h3:first-child{ margin-top:0; }
+  .modal-body p{ margin:0; font-size:0.92rem; line-height:1.6; color: var(--fg); }
+  .formula-block{
+    margin-top:8px; padding: 14px; background: var(--panel-2); border:1px solid var(--border);
+    border-radius:8px; overflow-x:auto;
+  }
+  .formula-block mjx-container{ color: var(--fg) !important; }
+</style>
+
+<div class="page">
+  <header class="page-head">
+    <p class="eyebrow">Modèle de Bühlmann · ZHL-16C</p>
+    <h1>Moniteur de Plongée</h1>
+    <p class="sub">Transposition interactive du modèle de décompression : l'azote se charge dans 16 compartiments tissulaires au fil de la plongée, et les paliers se déclenchent automatiquement dès qu'ils deviennent nécessaires.</p>
+    <button type="button" id="wikiBtn" class="info-btn">Comprendre le modèle</button>
+  </header>
+
+  <div class="layout">
+    <section class="scene-card">
+      <svg id="scene" viewBox="0 0 400 520" role="img" aria-label="Position du plongeur en fonction du temps et de la profondeur">
+        <defs>
+          <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--water-top)"/>
+            <stop offset="100%" stop-color="var(--water-bottom)"/>
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="400" height="520" fill="var(--water)"/>
+        <rect x="0" y="0" width="400" height="520" fill="url(#water)"/>
+        <g id="grid"></g>
+        <line id="ceilingLine" x1="50" x2="380" y1="54" y2="54" stroke="var(--danger)" stroke-width="2" stroke-dasharray="6 5" opacity="0.15"/>
+        <text id="ceilingLabel" class="ceil-label" x="376" y="48" text-anchor="end">—</text>
+        <g id="diver" class="diver-art" tabindex="0" role="button" aria-label="Plongeur — cliquer pour comprendre le modèle" transform="translate(200,54)">
+          <title>Cliquer pour comprendre le modèle</title>
+          <rect class="diver-tank" x="-9" y="-20" width="9" height="23" rx="4"/>
+          <circle class="diver-tank-valve" cx="-4.5" cy="-21" r="2.1"/>
+          <path class="diver-limb" d="M3,9 C11,9 15,15 25,13 C28,12.4 30,11 32,8.2 C25,11 16,12.3 10,14.2 C6,15.2 3,13 3,9 Z"/>
+          <path class="diver-fin" d="M25,13 L37,8 L35,16.5 L23,16.5 Z"/>
+          <path class="diver-body" d="M-11,-11 C-6.5,-15 2,-16 8.5,-11.5 C12.5,-8.5 12.5,-2 8.5,2 C2,6.5 -8.5,5.5 -12.5,0.3 C-14.5,-4 -13.5,-8.3 -11,-11 Z"/>
+          <path class="diver-limb" d="M6.5,-9.3 C14.5,-12.4 22.5,-13.4 30.5,-11.2 C24.5,-9.2 17,-8.2 9.8,-6.1 C6.8,-5.1 4.8,-7.2 6.5,-9.3 Z"/>
+          <path class="diver-limb" d="M-4.5,3.8 C3.5,5.8 9.5,9.8 17.5,9.8 C20.5,9.8 23.5,8.8 25.5,6.8 C18.5,9.8 9.5,9.8 3.5,7.8 C-1.5,6.8 -5.5,5.8 -4.5,3.8 Z"/>
+          <path class="diver-fin" d="M17.5,9.8 L30.5,5.8 L29.5,13.8 L16.5,14.8 Z"/>
+          <circle class="diver-head" cx="-14.5" cy="-10.3" r="6.6"/>
+          <path class="diver-mask" d="M-19.5,-13.3 C-16.2,-15.3 -11.2,-15.3 -9.2,-12.3 C-10.2,-9.3 -11.2,-7.3 -14.2,-7.3 C-17.2,-7.3 -19.5,-9.3 -19.5,-13.3 Z"/>
+          <path class="diver-hose" d="M-9.2,-10.3 C-4,-9.3 0.5,-11.3 2.5,-16.3" fill="none"/>
+          <g id="bubbles"></g>
+        </g>
+      </svg>
+
+      <div class="readouts">
+        <div class="readout"><span class="readout-label">Phase</span><span class="readout-value" id="roPhase">Prêt</span></div>
+        <div class="readout"><span class="readout-label">Temps</span><span class="readout-value" id="roTime">0.0 <small>min</small></span></div>
+        <div class="readout"><span class="readout-label">Profondeur</span><span class="readout-value" id="roDepth">0.0 <small>m</small></span></div>
+        <div class="readout"><span class="readout-label">Plafond</span><span class="readout-value" id="roCeil">surface</span></div>
+      </div>
+      <p class="status ok" id="statusMsg">Prêt à plonger.</p>
+    </section>
+
+    <aside class="side">
+      <section class="card">
+        <h2>Paramètres</h2>
+        <label class="field" for="profInput">Profondeur cible <span class="field-value" id="profVal">30 m</span></label>
+        <input type="range" id="profInput" min="10" max="50" step="1" value="30">
+
+        <label class="field" for="fondInput">Temps au fond <span class="field-value" id="fondVal">25 min</span></label>
+        <input type="range" id="fondInput" min="5" max="40" step="1" value="25">
+
+        <div class="speed-group" role="group" aria-label="Vitesse de lecture">
+          <button type="button" class="speed-btn active" id="speed05" data-speed="0.5">0.5×</button>
+          <button type="button" class="speed-btn" id="speed1" data-speed="1">1×</button>
+          <button type="button" class="speed-btn" id="speed2" data-speed="2">2×</button>
+        </div>
+
+        <div class="btn-row">
+          <button type="button" id="playBtn" class="btn primary">Plonger</button>
+          <button type="button" id="resetBtn" class="btn">Réinitialiser</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>16 compartiments</h2>
+        <p class="hint">Une barre = un tissu théorique (sa demi-vie en minutes). La couleur dit à quel point SA limite personnelle est proche de ta profondeur actuelle — rouge, c'est lui qui te bloque en ce moment.</p>
+        <div id="compList"></div>
+      </section>
+    </aside>
+  </div>
+
+
+</div>
+
+<div class="modal-backdrop" id="wikiBackdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wikiTitle">
+    <div class="modal-head">
+      <h2 id="wikiTitle">Comprendre le modèle</h2>
+      <button type="button" id="wikiClose" class="modal-close" aria-label="Fermer">✕</button>
+    </div>
+    <div class="modal-body">
+      <h3>Les 16 compartiments</h3>
+      <p>Le corps n'est pas uniforme face à l'azote : un tissu très irrigué (comme le sang) se charge vite, un tissu peu irrigué (comme la graisse) se charge très lentement. Le modèle de Bühlmann simplifie cette réalité en 16 compartiments théoriques, chacun avec sa propre vitesse de charge — sa demi-vie T, de 5 minutes à 635 minutes (~10h30). Chaque compartiment a aussi sa propre limite de tolérance à l'azote dissous (coefficients a et b) : au-delà, il impose une profondeur minimale avant de pouvoir remonter plus haut. Le plafond affiché est toujours celui du compartiment le plus exigeant du moment — le compartiment directeur.</p>
+      <h3>La formule</h3>
+      <div class="formula-block">
+        \[ P(t) = P_{alv} + (P_0 - P_{alv})\,e^{-kt} \]
+        \[ \text{plafond} = \max\big(b\,(P_{comp}-a),\ 1\big) \]
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var compartments = [
+    {T:5.0,   a:1.1696, b:0.5578},
+    {T:8.0,   a:1.0,    b:0.6514},
+    {T:12.5,  a:0.8618, b:0.7222},
+    {T:18.5,  a:0.7562, b:0.7825},
+    {T:27.0,  a:0.6200, b:0.8126},
+    {T:38.3,  a:0.5043, b:0.8434},
+    {T:54.3,  a:0.4410, b:0.8693},
+    {T:77.0,  a:0.4000, b:0.8910},
+    {T:109.0, a:0.3750, b:0.9092},
+    {T:146.0, a:0.3500, b:0.9222},
+    {T:187.0, a:0.3295, b:0.9319},
+    {T:239.0, a:0.3065, b:0.9403},
+    {T:305.0, a:0.2835, b:0.9477},
+    {T:390.0, a:0.2610, b:0.9544},
+    {T:498.0, a:0.2480, b:0.9602},
+    {T:635.0, a:0.2327, b:0.9653}
+  ];
+  var P_N2_AIR = 0.79;
+  var P0_INIT = 0.79;
+  var DT = 0.05; // minutes par pas d'intégration
+
+  var P = compartments.map(function(){ return P0_INIT; });
+  var simTime = 0, playing = false, finished = false, speedFactor = 0.5, lastTs = null;
+
+  function clamp(x, lo, hi){ return Math.max(lo, Math.min(hi, x)); }
+
+  function profilLibre(t, tDescente, profMax, tFond, vRemontee){
+    if (t <= tDescente) return profMax * (t / tDescente);
+    if (t <= tDescente + tFond) return profMax;
+    var tR = t - (tDescente + tFond);
+    return Math.max(profMax - vRemontee * tR, 0);
+  }
+
+  function pressionCompartiment(dt, P0c, Palv, demiVie){
+    var k = Math.log(2) / demiVie;
+    return Palv + (P0c - Palv) * Math.exp(-k * dt);
+  }
+
+  function plafondPression(Pcomp, a, b){
+    return Math.max(b * (Pcomp - a), 1.0);
+  }
+
+  function evalPlafonds(){
+    var maxP = 1.0, dir = -1, arr = new Array(16);
+    for (var i=0;i<16;i++){
+      var pc = plafondPression(P[i], compartments[i].a, compartments[i].b);
+      arr[i] = pc;
+      if (pc > maxP){ maxP = pc; dir = i; }
+    }
+    return {plafonds: arr, maxPlafond: maxP, directeur: dir};
+  }
+
+  function stepOnce(profMax, tFond, tDescente, vRemontee){
+    simTime += DT;
+    var profVoulue = profilLibre(simTime, tDescente, profMax, tFond, vRemontee);
+    var ev = evalPlafonds();
+    var ceilDepth = (ev.maxPlafond - 1) * 10;
+    var profActuelle = Math.max(profVoulue, ceilDepth);
+
+    var Pamb = 1 + profActuelle/10;
+    var Palv = Pamb * P_N2_AIR;
+    for (var i=0;i<16;i++){
+      P[i] = pressionCompartiment(DT, P[i], Palv, compartments[i].T);
+    }
+    if (profActuelle <= 0.01 && profVoulue <= 0.01){ finished = true; }
+    return {profActuelle: profActuelle, profVoulue: profVoulue, ceilDepth: ceilDepth, plafonds: ev.plafonds, directeur: ev.directeur};
+  }
+
+  function previewState(){
+    var profMax = Number(profInput.value), tFond = Number(fondInput.value), tDescente = profMax/15;
+    var profVoulue = profilLibre(simTime, tDescente, profMax, tFond, 10);
+    var ev = evalPlafonds();
+    var ceilDepth = (ev.maxPlafond - 1) * 10;
+    var profActuelle = Math.max(profVoulue, ceilDepth);
+    return {profActuelle: profActuelle, profVoulue: profVoulue, ceilDepth: ceilDepth, plafonds: ev.plafonds, directeur: ev.directeur};
+  }
+
+  // --- DOM refs ---
+  var profInput = document.getElementById('profInput');
+  var fondInput = document.getElementById('fondInput');
+  var profVal = document.getElementById('profVal');
+  var fondVal = document.getElementById('fondVal');
+  var playBtn = document.getElementById('playBtn');
+  var resetBtn = document.getElementById('resetBtn');
+  var statusMsg = document.getElementById('statusMsg');
+  var roPhase = document.getElementById('roPhase');
+  var roTime = document.getElementById('roTime');
+  var roDepth = document.getElementById('roDepth');
+  var roCeil = document.getElementById('roCeil');
+  var diverG = document.getElementById('diver');
+  var ceilingLine = document.getElementById('ceilingLine');
+  var ceilingLabel = document.getElementById('ceilingLabel');
+  var bubblesG = document.getElementById('bubbles');
+  var gridG = document.getElementById('grid');
+  var compList = document.getElementById('compList');
+  var speedBtns = [document.getElementById('speed05'), document.getElementById('speed1'), document.getElementById('speed2')];
+  var wikiBtn = document.getElementById('wikiBtn');
+  var wikiBackdrop = document.getElementById('wikiBackdrop');
+  var wikiClose = document.getElementById('wikiClose');
+
+  var SCENE_TOP = 54, SCENE_BOTTOM = 460, MAX_DEPTH = 50;
+  function depthToY(d){ return SCENE_TOP + (clamp(d,0,MAX_DEPTH)/MAX_DEPTH) * (SCENE_BOTTOM - SCENE_TOP); }
+
+  // --- static grid ---
+  [0,10,20,30,40,50].forEach(function(d){
+    var y = depthToY(d);
+    var ns = "http://www.w3.org/2000/svg";
+    var line = document.createElementNS(ns,"line");
+    line.setAttribute("x1","50"); line.setAttribute("x2","380");
+    line.setAttribute("y1",y); line.setAttribute("y2",y);
+    line.setAttribute("stroke", d===0 ? "var(--fg)" : "var(--border)");
+    line.setAttribute("stroke-width", d===0 ? "1.5" : "1");
+    line.setAttribute("opacity", d===0 ? "0.5" : "0.6");
+    gridG.appendChild(line);
+    var text = document.createElementNS(ns,"text");
+    text.setAttribute("x","40"); text.setAttribute("y", y+3.5);
+    text.setAttribute("text-anchor","end");
+    text.setAttribute("class", d===0 ? "surface-label" : "grid-label");
+    text.textContent = d===0 ? "Surface" : d+" m";
+    gridG.appendChild(text);
+  });
+
+  // --- bubbles (inside diver group, local coords) ---
+  var BUBBLE_COUNT = 12;
+  var bubbleOffsets = [];
+  var bubbleEls = [];
+  (function(){
+    var ns = "http://www.w3.org/2000/svg";
+    for (var i=0;i<BUBBLE_COUNT;i++){
+      var dx = Math.sin(i*2.1)*15;
+      var dy = Math.cos(i*1.7)*10 - 10;
+      var baseR = 1.1 + (i%4)*0.35;
+      bubbleOffsets.push({dx:dx, dy:dy, baseR:baseR});
+      var c = document.createElementNS(ns,"circle");
+      c.setAttribute("cx", dx); c.setAttribute("cy", dy); c.setAttribute("r", "0");
+      c.setAttribute("fill", "var(--accent)"); c.setAttribute("opacity","0");
+      bubblesG.appendChild(c);
+      bubbleEls.push(c);
+    }
+  })();
+
+  // --- compartment rows ---
+  var fillEls = [], badgeEls = [], rowEls = [];
+  compartments.forEach(function(c, i){
+    var row = document.createElement('div');
+    row.className = 'comp-row';
+    row.innerHTML =
+      '<span class="comp-label">C' + (i+1) + '<small>' + c.T + ' min</small></span>' +
+      '<span class="comp-track"><span class="comp-fill" id="fill' + i + '"></span></span>' +
+      '<span class="comp-badge" id="badge' + i + '" hidden>directeur</span>';
+    compList.appendChild(row);
+    rowEls.push(row);
+    fillEls.push(row.querySelector('.comp-fill'));
+    badgeEls.push(row.querySelector('.comp-badge'));
+  });
+
+  function render(state){
+    diverG.setAttribute('transform', 'translate(200,' + depthToY(state.profActuelle).toFixed(1) + ')');
+
+    var showCeil = state.ceilDepth > 0.4;
+    var cy = depthToY(state.ceilDepth);
+    ceilingLine.setAttribute('y1', cy); ceilingLine.setAttribute('y2', cy);
+    ceilingLine.style.opacity = showCeil ? 1 : 0.12;
+    ceilingLabel.setAttribute('y', cy - 6);
+    ceilingLabel.textContent = showCeil ? state.ceilDepth.toFixed(1) + ' m' : '';
+
+    var avgP = P.reduce(function(a,b){return a+b;},0) / P.length;
+    var charge = clamp((avgP - 0.79) / (3.3 - 0.79), 0, 1);
+    for (var i=0;i<BUBBLE_COUNT;i++){
+      bubbleEls[i].setAttribute('r', (bubbleOffsets[i].baseR * (0.4 + charge)).toFixed(2));
+      bubbleEls[i].style.opacity = (0.08 + charge*0.6).toFixed(2);
+    }
+
+    var tDescente = Number(profInput.value)/15, tFond = Number(fondInput.value);
+    var phase = simTime <= tDescente ? 'Descente' : (simTime <= tDescente+tFond ? 'Au fond' : 'Remontée');
+    roPhase.textContent = (!playing && finished) ? 'Terminé' : ((!playing && simTime===0) ? 'Prêt' : phase);
+
+    roTime.innerHTML = simTime.toFixed(1) + ' <small>min</small>';
+    roDepth.innerHTML = state.profActuelle.toFixed(1) + ' <small>m</small>';
+    roCeil.textContent = showCeil ? state.ceilDepth.toFixed(1) + ' m' : 'surface';
+
+    for (i=0;i<16;i++){
+      var frac = clamp((P[i]-0.79)/(4.2-0.79), 0, 1) * 100;
+      fillEls[i].style.width = frac.toFixed(1) + '%';
+      var ceilI = (state.plafonds[i]-1)*10;
+      var slack = clamp((state.profActuelle - ceilI)/15, 0, 1);
+      var hue = Math.round(slack*130);
+      fillEls[i].style.background = 'hsl(' + hue + ' 70% 50%)';
+      var isDir = (i === state.directeur);
+      rowEls[i].classList.toggle('directeur', isDir);
+      badgeEls[i].hidden = !isDir;
+    }
+
+    statusMsg.classList.remove('ok','warn','danger');
+    if (!playing && finished){
+      statusMsg.textContent = 'Plongée terminée — retour en surface à t = ' + simTime.toFixed(1) + ' min.';
+      statusMsg.classList.add('ok');
+    } else if (showCeil && state.profActuelle <= state.ceilDepth + 0.05 && phase === 'Remontée'){
+      statusMsg.textContent = 'Palier obligatoire : reste à ' + state.ceilDepth.toFixed(1) + ' m.';
+      statusMsg.classList.add('danger');
+    } else if (showCeil){
+      statusMsg.textContent = phase + ' — un palier de ' + state.ceilDepth.toFixed(1) + ' m sera nécessaire à la remontée.';
+      statusMsg.classList.add('warn');
+    } else {
+      statusMsg.textContent = phase === 'Remontée' ? 'Remontée libre jusqu’à la surface.' : (playing || simTime>0 ? phase + ' — en cours.' : 'Prêt à plonger.');
+      statusMsg.classList.add('ok');
+    }
+  }
+
+  function tick(ts){
+    if (!playing) return;
+    if (lastTs === null) lastTs = ts;
+    var deltaSec = Math.min((ts - lastTs)/1000, 0.25);
+    lastTs = ts;
+
+    var profMax = Number(profInput.value), tFond = Number(fondInput.value), tDescente = profMax/15, vRemontee = 10;
+    var toAdvance = deltaSec * speedFactor, state = null, steps = 0;
+    while (toAdvance > 0 && !finished && steps < 400){
+      state = stepOnce(profMax, tFond, tDescente, vRemontee);
+      toAdvance -= DT; steps++;
+    }
+    if (state) render(state);
+
+    if (finished){
+      playing = false; playBtn.textContent = 'Replonger';
+      render(state);
+      return;
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function resetSim(){
+    P = compartments.map(function(){ return P0_INIT; });
+    simTime = 0; playing = false; finished = false; lastTs = null;
+    playBtn.textContent = 'Plonger';
+    render(previewState());
+  }
+
+  playBtn.addEventListener('click', function(){
+    if (finished) resetSim();
+    if (!playing){
+      playing = true; lastTs = null; playBtn.textContent = 'Pause';
+      requestAnimationFrame(tick);
+    } else {
+      playing = false; playBtn.textContent = 'Reprendre';
+    }
+  });
+  resetBtn.addEventListener('click', resetSim);
+
+  profInput.addEventListener('input', function(){
+    profVal.textContent = profInput.value + ' m';
+    if (!playing) render(previewState());
+  });
+  fondInput.addEventListener('input', function(){
+    fondVal.textContent = fondInput.value + ' min';
+    if (!playing) render(previewState());
+  });
+
+  speedBtns.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      speedFactor = Number(btn.dataset.speed);
+      speedBtns.forEach(function(b){ b.classList.toggle('active', b===btn); });
+    });
+  });
+
+  function openWiki(){ wikiBackdrop.hidden = false; }
+  function closeWiki(){ wikiBackdrop.hidden = true; }
+  wikiBtn.addEventListener('click', openWiki);
+  diverG.addEventListener('click', openWiki);
+  diverG.addEventListener('keydown', function(e){ if (e.key==='Enter' || e.key===' '){ e.preventDefault(); openWiki(); } });
+  wikiClose.addEventListener('click', closeWiki);
+  wikiBackdrop.addEventListener('click', function(e){ if (e.target === wikiBackdrop) closeWiki(); });
+  document.addEventListener('keydown', function(e){ if (e.key==='Escape' && !wikiBackdrop.hidden) closeWiki(); });
+
+  render(previewState());
+
+  function boot(){ /* no persisted state to restore */ }
+  if (window.claude && window.claude.hot){
+    window.claude.hot.ready ? window.claude.hot.ready(boot) : boot();
+  }
+})();
+</script>
+
+</body></html>
