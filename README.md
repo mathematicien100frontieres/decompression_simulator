@@ -1,2 +1,9 @@
 # decompression_simulator
-simulateur de décompression en plongée sous-marine modèle de Bühlmann
+
+Simulateur de décompression
+
+Simulation pédagogique de la décompression en plongée, basée sur le modèle de Bühlmann.
+
+Accéder à la simulation : https://mathematicien100frontieres.github.io/decompression_simulator/simulation.html⁠
+
+Outil éducatif ne devant pas être utilisé pour planifier une plongée réelle.
