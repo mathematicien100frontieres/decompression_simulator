@@ -6,4 +6,6 @@ Simulation pédagogique de la décompression en plongée, basée sur le modèle 
 
 Accéder à la simulation : https://mathematicien100frontieres.github.io/decompression_simulator/simulation.html
 
+Lisez le rapport ^^
+
 Outil éducatif ne devant pas être utilisé pour planifier une plongée réelle.
